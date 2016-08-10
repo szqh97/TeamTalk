@@ -9,9 +9,12 @@
  *
  ================================================================*/
 #include "ClientConn.h"
-#include "playsound.h"
+//#include "playsound.h"
 #include "Common.h"
+#include "../base/util.h"
+#include "../base/imconn.h"
 
+static ConnMap_t g_clientConn_map;
 
 ClientConn::ClientConn():
 m_bOpen(false)
@@ -23,11 +26,22 @@ ClientConn::~ClientConn()
 {
 
 }
+void ClientConn::initPacketCallback(IPacketCallback *pCallback)
+{
+    m_pCallback = pCallback;
+}
 
 net_handle_t ClientConn::connect(const string& strIp, uint16_t nPort, const string& strName, const string& strPass)
 {
-	m_handle = netlib_connect(strIp.c_str(), nPort, imconn_callback, NULL);
-    return  m_handle;
+//    //m_handle = netlib_connect(strIp.c_str(), nPort, imconn_callback, NULL);
+//    m_handle = netlib_connect(strIp.c_str(), nPort, imconn_callback, NULL);
+//    return  m_handle;
+    m_handle = netlib_connect(strIp.c_str(), nPort, imconn_callback, &g_clientConn_map);
+    if (m_handle != NETLIB_INVALID_HANDLE) 
+    {
+        g_clientConn_map.insert(make_pair(m_handle, this));
+    }
+    return m_handle;
 }
 
 
@@ -38,6 +52,8 @@ void ClientConn::OnConfirm()
     {
         m_pCallback->onConnect();
     }
+    log("connect sucess..");
+    m_bOpen = true;
 }
 
 void ClientConn::OnClose()
@@ -48,6 +64,7 @@ void ClientConn::OnClose()
 
 void ClientConn::OnTimer(uint64_t curr_tick)
 {
+    log("IN client conn ontimer");
     if (curr_tick > m_last_send_tick + CLIENT_HEARTBEAT_INTERVAL) {
         CImPdu cPdu;
         IM::Other::IMHeartBeat msg;
@@ -57,6 +74,7 @@ void ClientConn::OnTimer(uint64_t curr_tick)
         uint32_t nSeqNo = m_pSeqAlloctor->getSeq(ALLOCTOR_PACKET);
         cPdu.SetSeqNum(nSeqNo);
         SendPdu(&cPdu);
+        log("OnTimer send Pdu");
     }
     
     if (curr_tick > m_last_recv_tick + CLIENT_TIMEOUT) {
@@ -74,12 +92,15 @@ uint32_t ClientConn::login(const string &strName, const string &strPass)
     msg.set_password(strPass);
     msg.set_online_status(IM::BaseDefine::USER_STATUS_ONLINE);
     msg.set_client_type(IM::BaseDefine::CLIENT_TYPE_WINDOWS);
-    msg.set_client_version("1.0");
+    //msg.set_client_type(IM::BaseDefine::CLIENT_TYPE_IOS);
+    msg.set_client_version("v1.1.0");
+    //IM::BaseDefine::SID_LOGIN, IM::BaseDefine::CID_LOGIN_REQ_USERLOGIN
     cPdu.SetPBMsg(&msg);
     cPdu.SetServiceId(IM::BaseDefine::SID_LOGIN);
     cPdu.SetCommandId(IM::BaseDefine::CID_LOGIN_REQ_USERLOGIN);
     uint32_t nSeqNo = m_pSeqAlloctor->getSeq(ALLOCTOR_PACKET);
     cPdu.SetSeqNum(nSeqNo);
+    log("pdu buf is %s, lenght is %d", cPdu.GetBuffer(), cPdu.GetLength());
     SendPdu(&cPdu);
     return nSeqNo;
 }
@@ -202,22 +223,22 @@ uint32_t ClientConn::sendMsgAck(uint32_t nUserId, uint32_t nPeerId, IM::BaseDefi
 
 void ClientConn::Close()
 {
-	if (m_handle != NETLIB_INVALID_HANDLE) {
-		netlib_close(m_handle);
-	}
-	ReleaseRef();
+    if (m_handle != NETLIB_INVALID_HANDLE) {
+        netlib_close(m_handle);
+    }
+    ReleaseRef();
 }
 
 void ClientConn::HandlePdu(CImPdu* pPdu)
 {
     //printf("pdu type = %u\n", pPdu->GetPduType());
-	switch (pPdu->GetCommandId()) {
+    switch (pPdu->GetCommandId()) {
         case IM::BaseDefine::CID_OTHER_HEARTBEAT:
-//		printf("Heartbeat\n");
-		break;
+//        printf("Heartbeat\n");
+        break;
         case IM::BaseDefine::CID_LOGIN_RES_USERLOGIN:
             _HandleLoginResponse(pPdu);
-		break;
+        break;
         case IM::BaseDefine::CID_BUDDY_LIST_ALL_USER_RESPONSE:
             _HandleUser(pPdu);
         break;
@@ -240,9 +261,9 @@ void ClientConn::HandlePdu(CImPdu* pPdu)
             _HandleMsgData(pPdu);
             break;
         default:
-		log("wrong msg_type=%d\n", pPdu->GetCommandId());
-		break;
-	}
+        log("wrong msg_type=%d\n", pPdu->GetCommandId());
+        break;
+    }
 }
 void ClientConn::_HandleLoginResponse(CImPdu* pPdu)
 {
@@ -403,7 +424,7 @@ void ClientConn::_HandleMsgData(CImPdu* pPdu)
     uint32_t nSeqNo = pPdu->GetSeqNum();
     if(msg.ParseFromArray(pPdu->GetBodyData(), pPdu->GetBodyLength()))
     {
-        play("message.wav");
+       // play("message.wav");
         
         uint32_t nFromId = msg.from_user_id();
         uint32_t nToId = msg.to_session_id();

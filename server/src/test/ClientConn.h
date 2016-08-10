@@ -23,10 +23,13 @@
 #include "IPacketCallback.h"
 #include "SeqAlloctor.h"
 
+static ConnMap_t g_proxy_conn_map;
+
 class ClientConn : public CImConn
 {
 public:
 	ClientConn();
+    void initPacketCallback(IPacketCallback *pCallback);
 	virtual ~ClientConn();
 
 	bool IsOpen() { return m_bOpen; }

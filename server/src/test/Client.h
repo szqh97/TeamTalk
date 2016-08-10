@@ -22,7 +22,7 @@ typedef hash_map<string, IM::BaseDefine::UserInfo*> CMapNick2User_t;
 class CClient:public IPacketCallback
 {
 public:
-    CClient(const string& strName, const string& strPass, const string strDomain="access.tt.mogujie.org");
+    CClient(const string& strName, const string& strPass, const string strDomain="120.26.137.224:48081");
     ~CClient();
 public:
     string getName(){ return m_strName; }

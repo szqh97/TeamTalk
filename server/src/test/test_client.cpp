@@ -17,7 +17,7 @@
 #include "Thread.h"
 #include "IM.BaseDefine.pb.h"
 #include "IM.Buddy.pb.h"
-#include "playsound.h"
+//#include "playsound.h"
 #include "Common.h"
 #include "Client.h"
 using namespace std;
@@ -83,8 +83,12 @@ void exec_cmd()
 	if (g_cmd_num == 0) {
 		return;
 	}
-    
-    if(g_cmd_string[0] == "login")
+    if(g_cmd_string[0] == "lempty")
+    {
+        doLogin("", "");
+    }
+
+    else if(g_cmd_string[0] == "login")
     {
         if(g_cmd_num == 3)
         {
